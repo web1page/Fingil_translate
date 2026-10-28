@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#ffffff">
+<title>مترجم فارسی و فینگلیش</title>
+<style>
+:root{font-family:Tahoma,"Segoe UI",sans-serif;color:#202124;background:#fff;color-scheme:light}
+*{box-sizing:border-box}body{margin:0;line-height:1.8}main{width:min(760px,calc(100% - 28px));margin:7vh auto 32px}
+h1{font-size:clamp(22px,4vw,30px);margin:0 0 4px;font-weight:700}p{margin:0 0 24px;color:#5f6368;font-size:14px}
+label{display:block;font-size:14px;font-weight:700;margin:16px 0 7px}
+textarea,.output{width:100%;min-height:190px;padding:15px;border:1px solid #dadce0;border-radius:12px;background:#fff;color:#202124;font:16px/2 Tahoma,"Segoe UI",sans-serif;resize:vertical;overflow-wrap:anywhere}
+textarea:focus{outline:2px solid #1a73e8;border-color:transparent}.output{white-space:pre-wrap;min-height:190px}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:12px 0}
+button,select{font:inherit;border:1px solid #dadce0;border-radius:9px;padding:10px 14px;background:#fff;color:#202124;cursor:pointer}
+button.primary{background:#1a73e8;color:white;border-color:#1a73e8;font-weight:700}
+button:hover{filter:brightness(.97)}.hint{font-size:12px;color:#5f6368;margin-top:8px}.status{font-size:13px;color:#188038;min-height:22px}
+@media(max-width:480px){main{margin-top:28px}.row button{flex:1}.output,textarea{min-height:150px}}
+</style>
+</head>
+<body>
+<main>
+<h1>مترجم فارسی و فینگلیش</h1>
+<p>متنت را وارد کن و ترجمه را بگیر.</p>
+<label for="direction">جهت ترجمه</label>
+<div class="row"><select id="direction" aria-label="جهت ترجمه"><option value="fa-en">فارسی ← فینگلیش</option><option value="en-fa">فینگلیش ← فارسی</option></select></div>
+<label for="source">متن ورودی</label>
+<textarea id="source" placeholder="متن را اینجا وارد کن…" spellcheck="false"></textarea>
+<div class="row"><button class="primary" id="translate">ترجمه</button><button id="clear">پاک‌کردن</button></div>
+<label for="output">ترجمه</label>
+<div class="output" id="output" aria-live="polite" dir="auto"></div>
+<div class="row"><button id="copy">کپی ترجمه</button></div>
+<div class="status" id="status" role="status"></div>
+<div class="hint">نوشتار فینگلیش استاندارد واحدی ندارد؛ در موارد مبهم ممکن است لازم باشد خروجی را دستی اصلاح کنی.</div>
+</main>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id), source=$('source'), output=$('output'), direction=$('direction'), status=$('status');
+const normalizeFa=s=>s.normalize('NFC').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/ۀ/g,'ه').replace(/[ـًٌٍَُِّْٰ]/g,'');
+const normalizeLat=s=>s.toLowerCase().replace(/[’‘`]/g,"'").replace(/[‐‑–—]/g,'-');
+const faToLat={
+'سلام':'salaam','درود':'dorood','خوب':'khoob','خوبه':'khoobe','خوبی':'khoobi','خوبم':'khoobam','چطوری':'chetori','چطوره':'chetore','چطور':'chetor','حالت':'haalet','چه':'che','خبر':'khabar','من':'man','تو':'to','شما':'shoma','ما':'maa','اون':'oon','اونا':'oona','او':'oo','این':'in','آن':'aan',
+'هستم':'hastam','هستی':'hasti','هست':'hast','هستیم':'hastim','هستن':'hastan','بودم':'boodam','بودی':'boodi','بود':'bood','دارم':'daaram','داری':'daari','داره':'daare','داریم':'daarim','دارند':'daarand','خیلی':'kheyli','عالی':'aali','باحال':'baahaal','قشنگ':'ghashang','بامزه':'baamaze','مرسی':'merci','ممنون':'mamnoon','ممنونم':'mamnoonam','متشکرم':'moteshakkeram','لطفا':'lotfan','لطفاً':'lotfan','ببخشید':'bebakhshid','خواهش':'khaahesh','میکنم':'mikonam','می‌کنم':'mikonam','می‌کنید':'mikoniid','خواهشمیکنم':'khaahesh mikonam','خداحافظ':'khodaa haafez','خدا':'khoda','حافظ':'haafez',
+'عشق':'eshgh','عزیزم':'azizam','دوست':'doost','دوستت':'dooset','دارم':'daaram','زندگی':'zendegi','دنیا':'donya','امروز':'emrooz','فردا':'farda','دیروز':'dirooz','الان':'alaan','بعد':'baad','بعدا':'baadan','کجا':'kojaa','کی':'key','چرا':'cheraa','چون':'chon','چی':'chi','چیکار':'chikaar','می‌کنی':'mikoni','میکنی':'mikoni','نمی‌دونم':'nemidoonam','نمیدونم':'nemidoonam','اسم':'esm','اسمم':'esmam','اسمت':'esmet','آره':'are','اره':'are','نه':'na','بله':'bale','باشه':'bashe','حتما':'hatman','حتماً':'hatman',
+'کار':'kaar','کارت':'kaaret','مدرسه':'madrese','دانشگاه':'daneshgaah','کتاب':'ketaab','خانه':'khaane','خونه':'khoone','پول':'pool','روز':'rooz','شب':'shab','صبح':'sobh','آب':'aab','هوا':'hava','ایران':'iraan','ایرانی':'irani','فارسی':'farsi','فینگلیش':'finglish','ترجمه':'tarjome','متن':'matn',
+'رفتم':'raftam','رفتی':'rafti','رفت':'raft','می‌روم':'miravam','میرم':'miram','بریم':'berim','بیا':'bia','برو':'boro','بگو':'bego','ببین':'bebin','کدوم':'kodoom','همه':'hame','همیشه':'hamishe','گاهی':'gahi','شاید':'shaayad','ولی':'vali','اما':'amma','اگر':'agar','برای':'baraaye','با':'ba','بدون':'bedoone','از':'az','به':'be','در':'dar','و':'o','یا':'yaa','هم':'ham','همه‌چی':'hamechi','چیزی':'chizi','هیچی':'hichi','هیچ':'hich','خوشحال':'khoshhaal','ناراحت':'naaraahat','قربونت':'ghorboonet','فدات':'fadaat','تبریک':'tabrik','تولدت':'tavalodet','مبارک':'mobaarak','موفق':'movafagh','موفقیت':'movafaghiyat','منم':'manam','خوبن':'khooban','چراکه':'cherake','بیشتر':'bishtar','کمتر':'kamتر','ولی':'vali','چونکه':'chonke','امشب':'emshab','دیگه':'dige','الکی':'alaki','الان':'alan','همین':'hamin','اونجا':'oonja','اینجا':'inja','میخوام':'mikhaam','می‌خوام':'mikhaam','میخوای':'mikhay','می‌خوای':'mikhay','میاد':'miad','اومدم':'oomadam','اومدی':'oomadi','اومد':'oomad','باید':'baayad','میشه':'mishe','می‌شه':'mishe','نمیشه':'nemishe','نمی‌شه':'nemishe','هستم':'hastam','نیستم':'nistam','دوست‌دارم':'dooset daram','دوست دارم':'dooset daram','چه خبر':'che khabar','خواهش میکنم':'khaahesh mikonam'
+};
+const latToFa={
+'salam':'سلام','salaam':'سلام','dorood':'درود','khoob':'خوب','khub':'خوب','khoobe':'خوبه','khobi':'خوبی','khoobi':'خوبی','khubam':'خوبم','khoobam':'خوبم','chetori':'چطوری','chetoori':'چطوری','chetore':'چطوره','chetor':'چطور','haalet':'حالت','halet':'حالت','man':'من','to':'تو','shoma':'شما','maa':'ما','ma':'ما','oon':'اون','oona':'اونا','in':'این','aan':'آن','hastam':'هستم','hasti':'هستی','hast':'هست','hastim':'هستیم','hastan':'هستن','boodam':'بودم','bood':'بود','daaram':'دارم','daram':'دارم','daari':'داری','daare':'داره','kheyli':'خیلی','aali':'عالی','baahaal':'باحال','bahal':'باحال','ghashang':'قشنگ','merci':'مرسی','mamnoon':'ممنون','mamnoonam':'ممنونم','moteshakkeram':'متشکرم','lotfan':'لطفا','bebakhshid':'ببخشید','khaahesh':'خواهش','khodahafez':'خداحافظ','khoda':'خدا','eshgh':'عشق','azizam':'عزیزم','doost':'دوست','dust':'دوست','dooset':'دوستت','duset':'دوستت','zendegi':'زندگی','donya':'دنیا','emrooz':'امروز','farda':'فردا','dirooz':'دیروز','alan':'الان','alaan':'الان','baad':'بعد','koja':'کجا','kojaa':'کجا','chera':'چرا','cheraa':'چرا','chon':'چون','chi':'چی','chikar':'چیکار','mikoni':'میکنی','mikonam':'میکنم','nemidoonam':'نمیدونم','esm':'اسم','esmam':'اسمم','esmet':'اسمت','are':'آره','na':'نه','bale':'بله','bashe':'باشه','hatman':'حتما','kaar':'کار','kar':'کار','madrese':'مدرسه','daneshgah':'دانشگاه','daneshgaah':'دانشگاه','ketaab':'کتاب','ketab':'کتاب','khaane':'خانه','khane':'خانه','khoone':'خونه','pool':'پول','rooz':'روز','shab':'شب','sobh':'صبح','aab':'آب','ab':'آب','hava':'هوا','iran':'ایران','iraan':'ایران','irani':'ایرانی','farsi':'فارسی','finglish':'فینگلیش','raftam':'رفتم','rafti':'رفتی','raft':'رفت','miram':'میرم','berim':'بریم','bia':'بیا','boro':'برو','bego':'بگو','begu':'بگو','bebin':'ببین','kodoom':'کدوم','hame':'همه','hamishe':'همیشه','gahi':'گاهی','shaayad':'شاید','shayad':'شاید','vali':'ولی','amma':'اما','agar':'اگر','baraaye':'برای','baraye':'برای','bedoone':'بدون','az':'از','be':'به','dar':'در','o':'و','yaa':'یا','ya':'یا','ham':'هم','hamechi':'همه‌چی','chizi':'چیزی','hichi':'هیچی','hich':'هیچ','khoshhaal':'خوشحال','naaraahat':'ناراحت','ghorboonet':'قربونت','fadaat':'فدات','tabrik':'تبریک','tavalodet':'تولدت','mobaarak':'مبارک','movafagh':'موفق','movafaghiyat':'موفقیت','manam':'منم','dige':'دیگه','mikhaam':'میخوام','mikhay':'میخوای','miad':'میاد','oomadam':'اومدم','oomadi':'اومدی','oomad':'اومد','baayad':'باید','mishe':'میشه','nemishe':'نمیشه','nistam':'نیستم','inja':'اینجا','oonja':'اونجا','emshab':'امشب','bishtar':'بیشتر','kamتر':'کمتر','cherake':'چراکه','chonke':'چونکه','doosetdaram':'دوستتدارم'
+};
+const faChars={'ا':'a','آ':'aa','ب':'b','پ':'p','ت':'t','ث':'s','ج':'j','چ':'ch','ح':'h','خ':'kh','د':'d','ذ':'z','ر':'r','ز':'z','ژ':'zh','س':'s','ش':'sh','ص':'s','ض':'z','ط':'t','ظ':'z','ع':'','غ':'gh','ف':'f','ق':'gh','ک':'k','گ':'g','ل':'l','م':'m','ن':'n','و':'v','ه':'h','ة':'e','ی':'i','ء':'','ئ':'y','ؤ':'v','إ':'e','أ':'a','ٱ':'a'};
+function faWord(w){
+ const n=normalizeFa(w), compact=n.replace(/‌/g,'');
+ if(faToLat[n])return faToLat[n];
+ if(faToLat[compact])return faToLat[compact];
+ let out=[...n].map((c,i,a)=>{
+  if(c==='و'){const prev=a[i-1]||'',next=a[i+1]||'';return i===0?'v':(!next||/[\s،؛,.!?؟:]/u.test(next))?'o':(/[بپتثجچحخدذرزژسشصضطظعغفقکگلمنهی]/u.test(prev)&&/[بپتثجچحخدذرزژسشصضطظعغفقکگلمنهی]/u.test(next))?'o':'v'}
+  if(c==='ی')return 'i'; if(c==='ه'&&(i===a.length-1||/[؟?!.,،؛:]/u.test(a[i+1]||'')))return 'e';
+  return faChars[c]!==undefined?faChars[c]:c;
+ }).join('');
+ return out;
+}
+const digraphs=[['kh','خ'],['gh','غ'],['sh','ش'],['ch','چ'],['zh','ژ'],['aa','ا'],['oo','و'],['ee','ی'],['ou','و'],['ph','ف'],['th','ث']];
+const latChars={a:'ا',b:'ب',c:'ک',d:'د',e:'ه',f:'ف',g:'گ',h:'ه',i:'ی',j:'ج',k:'ک',l:'ل',m:'م',n:'ن',o:'و',p:'پ',q:'ق',r:'ر',s:'س',t:'ت',u:'و',v:'و',w:'و',x:'کس',y:'ی',z:'ز',"'":'ع'};
+function latWord(w){
+ const n=normalizeLat(w), bare=n.replace(/^[^a-z']+|[^a-z']+$/g,'');
+ if(latToFa[bare])return n.replace(bare,latToFa[bare]);
+ let out='',i=0;
+ while(i<n.length){const pair=n.slice(i,i+2),found=digraphs.find(x=>x[0]===pair);
+ if(found){out+=found[1];i+=2;continue}
+ const c=n[i];out+=latChars[c]!==undefined?latChars[c]:c;i++}
+ return out;
+}
+function translate(text,mode){
+ const normalized=mode==='fa-en'?normalizeFa(text):normalizeLat(text);
+ // Convert phrases before words, while preserving whitespace and punctuation.
+ let s=normalized;
+ const phrases=mode==='fa-en'?
+ [['دوست دارم','dooset daram'],['دوست‌دارم','dooset daram'],['چه خبر','che khabar'],['خواهش میکنم','khaahesh mikonam'],['خواهش‌میکنم','khaahesh mikonam']]:
+ [['dooset daram','دوست دارم'],['doost daram','دوست دارم'],['che khabar','چه خبر'],['khaahesh mikonam','خواهش می‌کنم']];
+ for(const [a,b] of phrases)s=s.replaceAll(a,b);
+ const tokens=s.match(/[\p{L}\p{M}\p{N}]+(?:[‌'’-][\p{L}\p{M}\p{N}]+)*|[^\p{L}\p{M}\p{N}]+/gu)||[];
+ return tokens.map(t=>{
+  if(!/[\p{L}\p{M}\p{N}]/u.test(t))return t;
+  if(mode==='fa-en'&&/[\u0600-\u06FF]/u.test(t))return faWord(t);
+  if(mode==='en-fa'&&/[A-Za-z]/.test(t)&&!/[ \u0600-\u06FF]/u.test(t))return latWord(t);
+  return t;
+ }).join('');
+}
+$('translate').addEventListener('click',()=>{if(!source.value.trim()){output.textContent='';status.textContent='ابتدا متن را وارد کن.';return}output.textContent=translate(source.value,direction.value);status.textContent='ترجمه آماده است.'});
+$('clear').addEventListener('click',()=>{source.value='';output.textContent='';status.textContent='';source.focus()});
+$('copy').addEventListener('click',async()=>{if(!output.textContent){status.textContent='ترجمه‌ای برای کپی وجود ندارد.';return}try{await navigator.clipboard.writeText(output.textContent);status.textContent='ترجمه کپی شد.'}catch{const r=document.createRange();r.selectNodeContents(output);const sel=getSelection();sel.removeAllRanges();sel.addRange(r);status.textContent='متن ترجمه انتخاب شد؛ آن را کپی کن.'}});
+source.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')$('translate').click()});
+})();
+</script>
+</body>
+</html>
